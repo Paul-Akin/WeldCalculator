@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Weld-as-a-Line Capacity Calculator — Table 22.3</title>
+<style>
+  :root{
+    --ink:#1a2332; --paper:#f5f3ee; --sheet:#ffffff; --line:#d8d2c4;
+    --weld:#8b1a1a; --dim:#1d5fbf; --accent:#0e7a5f; --warn:#b45309; --bad:#b91c1c;
+    --mathfont:"STIX Two Math","Cambria Math","Times New Roman",Georgia,serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);
+       font:15px/1.5 "Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif}
+  header{background:#1a2332;color:#f2efe8;padding:18px 28px;border-bottom:4px solid var(--weld)}
+  header h1{margin:0;font-size:21px;font-weight:600;letter-spacing:.2px}
+  header .sub{font-size:13px;opacity:.75;margin-top:4px}
+  .wrap{display:flex;gap:20px;padding:20px 28px;max-width:1500px;margin:0 auto;align-items:flex-start;flex-wrap:wrap}
+  .panel{background:var(--sheet);border:1px solid var(--line);border-radius:8px;
+         box-shadow:0 1px 3px rgba(0,0,0,.07)}
+  #controls{flex:0 0 380px;padding:18px;position:sticky;top:14px}
+  #worksheet{flex:1 1 640px;min-width:520px;padding:6px 26px 26px}
+  h2{font-size:15px;text-transform:uppercase;letter-spacing:.8px;color:#5a5140;
+     border-bottom:2px solid var(--line);padding-bottom:6px;margin:26px 0 12px}
+  #controls h2{margin-top:14px}
+  #controls h2:first-child{margin-top:0}
+
+  /* shape picker */
+  #shapes{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+  #shapes button{background:#fbfaf7;border:1.5px solid var(--line);border-radius:6px;
+                 padding:4px 2px 1px;cursor:pointer;transition:border-color .12s, background .12s}
+  #shapes button:hover{border-color:#a89f8d}
+  #shapes button.sel{border-color:var(--weld);background:#fdf3f0;box-shadow:0 0 0 1px var(--weld)}
+  #shapes button svg{display:block;width:100%;height:auto}
+  #shapes .cap{font-size:9.5px;color:#6b6353;text-align:center;line-height:1.2;padding-bottom:2px}
+
+  /* inputs */
+  .field{display:flex;align-items:baseline;gap:8px;margin:8px 0}
+  .field label{flex:0 0 175px;font-size:13.5px}
+  .field label b{font-family:var(--mathfont);font-style:italic;font-size:15px}
+  .field input,.field select{flex:1;padding:5px 8px;border:1px solid #bbb2a0;border-radius:5px;
+        font:14px/1.2 inherit;background:#fff;min-width:0}
+  .field .unit{flex:0 0 44px;font-size:12.5px;color:#6b6353}
+  .fieldnote{font-size:11.5px;color:#8a8172;margin:-4px 0 8px 183px}
+  .loadhdr{font-size:12px;color:#6b6353;margin:10px 0 2px}
+
+  /* selected shape diagram */
+  #bigshape{display:flex;justify-content:center;padding:8px 0 2px}
+  #bigshape svg{width:230px;height:auto}
+  #shapename{text-align:center;font-size:13.5px;font-weight:600;color:#3d3628;margin-bottom:4px}
+
+  /* MathCAD-style regions */
+  .region{border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:6px;
+          background:#fdfdfb;padding:12px 16px;margin:12px 0}
+  .region.props{border-left-color:var(--dim)}
+  .region.allow{border-left-color:var(--accent)}
+  .region.cap{border-left-color:var(--weld)}
+  .region.chk{border-left-color:var(--warn)}
+  .rtitle{font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;
+          color:#6b6353;margin-bottom:8px}
+  .step{font-family:var(--mathfont);font-size:17.5px;padding:7px 0;border-bottom:1px dotted #e6e1d5;
+        display:flex;align-items:center;flex-wrap:wrap;column-gap:10px;row-gap:4px}
+  .step:last-child{border-bottom:none}
+  .step .lhs{font-style:italic;white-space:nowrap}
+  .step .eq{color:#8a8172}
+  .step .sym{white-space:nowrap}
+  .step .sub{white-space:nowrap;color:#3f4c66}
+  .step .res{white-space:nowrap;font-weight:700;color:#0d3b66}
+  .step .res.good{color:var(--accent)}
+  .step .res.bad{color:var(--bad)}
+  .step .note{font-family:"Segoe UI",system-ui,sans-serif;font-size:12px;color:#8a8172;font-style:normal}
+  sub,sup{line-height:0}
+  var{font-style:italic;font-family:var(--mathfont)}
+
+  /* stacked fraction */
+  .fr{display:inline-flex;flex-direction:column;vertical-align:middle;text-align:center;
+      margin:0 2px;line-height:1.15}
+  .fr .n{display:block;padding:0 4px;border-bottom:1.4px solid currentColor}
+  .fr .d{display:block;padding:0 4px}
+  .sqrt{white-space:nowrap}
+
+  .verdict{font-family:"Segoe UI",system-ui,sans-serif;font-size:14px;font-weight:700;
+           padding:8px 12px;border-radius:6px;margin-top:10px;display:inline-block}
+  .verdict.ok{background:#e8f5ef;color:#0e6b52;border:1px solid #bfe3d4}
+  .verdict.no{background:#fbeaea;color:#a02020;border:1px solid #eec6c6}
+  .bar{height:10px;background:#eae6db;border-radius:5px;margin-top:8px;overflow:hidden;max-width:420px}
+  .bar i{display:block;height:100%;background:var(--accent)}
+  .bar i.over{background:var(--bad)}
+
+  .notes{font-size:12.5px;color:#6b6353;line-height:1.55}
+  .notes li{margin-bottom:5px}
+  .tagline{font-size:11.5px;color:#988f7d;margin-top:18px;border-top:1px solid var(--line);padding-top:8px}
+  .err{color:var(--bad);font-weight:600;padding:10px 0}
+  @media (max-width:900px){ #controls{position:static;flex-basis:100%} #worksheet{min-width:0} }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Welded Connection Capacity — Treating the Weld as a Line</h1>
+  <div class="sub">Per TABLE 22.3, Blodgett &amp; Miller, “Welded Connections,” <i>Structural Engineering Handbook</i>
+  (CRC Press, 1999) — force-on-weld formulas per Table 22.2, allowables per Table 22.4 (AWS D1.1)</div>
+</header>
+
+<div class="wrap">
+
+  <!-- ============ LEFT: INPUTS ============ -->
+  <div class="panel" id="controls">
+    <h2>1 · Weld configuration</h2>
+    <div id="shapes"></div>
+    <div id="shapename"></div>
+    <div id="bigshape"></div>
+
+    <h2>2 · Weld dimensions</h2>
+    <div class="field" id="f-b"><label><b>b</b> — width of weld group</label>
+      <input type="number" id="in-b" value="4" step="0.125" min="0"><span class="unit">in</span></div>
+    <div class="field" id="f-d"><label><b>d</b> — depth of weld group</label>
+      <input type="number" id="in-d" value="6" step="0.125" min="0"><span class="unit">in</span></div>
+    <div class="field" id="f-D" style="display:none"><label><b>D</b> — second circle dia.</label>
+      <input type="number" id="in-D" value="3" step="0.125" min="0"><span class="unit">in</span></div>
+    <div class="field"><label><b>&omega;</b> — fillet weld leg size</label>
+      <input type="number" id="in-w" value="0.25" step="0.0625" min="0"><span class="unit">in</span></div>
+    <div class="fieldnote">throat = 0.707&thinsp;&omega; (equal-leg fillet, Sec. 22.2.3)</div>
+
+    <h2>3 · Materials (Table 22.4)</h2>
+    <div class="field"><label>Electrode F<sub>EXX</sub></label>
+      <select id="in-fexx">
+        <option value="60">E60 — 60 ksi</option>
+        <option value="70" selected>E70 — 70 ksi</option>
+        <option value="80">E80 — 80 ksi</option>
+        <option value="90">E90 — 90 ksi</option>
+        <option value="100">E100 — 100 ksi</option>
+        <option value="110">E110 — 110 ksi</option>
+      </select><span class="unit"></span></div>
+    <div class="field"><label><b>F<sub>y</sub></b> — base metal yield</label>
+      <input type="number" id="in-fy" value="36" step="1" min="1"><span class="unit">ksi</span></div>
+    <div class="field"><label><b>t</b> — thinner plate thickness</label>
+      <input type="number" id="in-t" value="0.375" step="0.0625" min="0"><span class="unit">in</span></div>
+
+    <h2>4 · Applied loads <span style="font-weight:400;text-transform:none">(optional)</span></h2>
+    <div class="loadhdr">Leave at 0 to see line capacities only.</div>
+    <div class="field"><label><b>P</b> — axial (tension/comp.)</label>
+      <input type="number" id="in-P" value="0" step="0.5"><span class="unit">kips</span></div>
+    <div class="field"><label><b>V</b> — vertical shear</label>
+      <input type="number" id="in-V" value="0" step="0.5"><span class="unit">kips</span></div>
+    <div class="field"><label><b>M</b> — bending about x-x</label>
+      <input type="number" id="in-M" value="0" step="1"><span class="unit">k·in</span></div>
+    <div class="field"><label><b>T</b> — twisting (torsion)</label>
+      <input type="number" id="in-T" value="0" step="1"><span class="unit">k·in</span></div>
+  </div>
+
+  <!-- ============ RIGHT: WORKSHEET ============ -->
+  <div class="panel" id="worksheet">
+    <div id="out"></div>
+
+    <h2>Notes</h2>
+    <ul class="notes">
+      <li>Method of Sec.&nbsp;22.3.5–22.3.8: the weld is treated as a line with length but no area.
+          Standard design formulas (Table&nbsp;22.2) then give a <b>unit force</b> <var>f</var> in kips per
+          linear inch of weld instead of a stress, which is compared with the allowable unit force of the
+          weld to find the required size or capacity.</li>
+      <li>Allowable weld shear = 0.30&thinsp;&times;&thinsp;nominal tensile strength of filler metal
+          (Table&nbsp;22.4), acting on the effective throat 0.707&thinsp;&omega;. Shear on the adjacent base
+          metal is limited to 0.40&thinsp;&times;&thinsp;F<sub>y</sub>&thinsp;&times;&thinsp;t.</li>
+      <li>Where more than one load acts, unit forces are combined <b>vectorially</b> at the same point on the
+          joint (Sec.&nbsp;22.3.6). The worksheet checks the extreme top and bottom corners of the weld group
+          and reports the governing point.</li>
+      <li>AWS D1.1 minimum fillet sizes (by thickness of thicker part joined): t&nbsp;&le;&nbsp;&frac14;&Prime; &rarr; &frac18;&Prime;,
+          &le;&nbsp;&frac12;&Prime; &rarr; 3/16&Prime;, &le;&nbsp;&frac34;&Prime; &rarr; &frac14;&Prime;, &gt;&nbsp;&frac34;&Prime; &rarr; 5/16&Prime;.
+          Along an edge of material &ge; &frac14;&Prime; thick, &omega;<sub>max</sub> = t &minus; 1/16&Prime;.</li>
+      <li><b>Printing corrections (†)</b> applied to the CRC reproduction of Table&nbsp;22.3, verified by direct
+          line-integration of each weld group:
+          the centroid distances print with an extra power (e.g. “N<sub>x</sub>&nbsp;=&nbsp;d&sup3;/2(b+d)”) —
+          dimensional consistency requires d&sup2;;
+          shape&nbsp;4 (L) bottom S<sub>w</sub> = d&sup2;(4b+d)/[6(2b+d)] (the table repeats the channel
+          expression, which does not satisfy S<sub>w</sub> = I<sub>x</sub>/c);
+          shape&nbsp;6 (&#8851;) J<sub>w</sub> second term is d&sup2;(b+d)&sup2;/(b+2d) (printed with b&sup2;).
+          For shape&nbsp;8 the published table repeats shape&nbsp;6&rsquo;s J<sub>w</sub>, which includes a
+          b&sup2;d/2 flange-offset term the centered stem welds do not have; the worksheet shows the published
+          value but uses the corrected (smaller, conservative) J<sub>w</sub> for torsional capacity.
+          Shape&nbsp;13&rsquo;s S<sub>w</sub> is used exactly as published.</li>
+      <li>Sign convention: P, V, M, T magnitudes are combined additively (worst case). Units: inches, kips, ksi.
+          For guidance only — final designs must be verified by a licensed engineer against the governing code.</li>
+    </ul>
+
+    <div class="tagline">Weld-as-a-line calculator &middot; formulas courtesy of The Lincoln Electric Company via
+      Blodgett &amp; Miller, CRC <i>Structural Engineering Handbook</i> (1999), Tables 22.2–22.4.</div>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   Formula display helpers (MathCAD-style)
+   ===================================================================== */
+const fr = (n, d) => `<span class="fr"><span class="n">${n}</span><span class="d">${d}</span></span>`;
+const sq = s => `<span class="sqrt">&radic;<span style="border-top:1.4px solid currentColor;padding:0 2px">${s}</span></span>`;
+
+function n(x){                       // number formatter
+  if (!isFinite(x)) return "&mdash;";
+  const a = Math.abs(x);
+  if (a === 0) return "0";
+  if (a >= 10000) return x.toLocaleString("en-US", {maximumFractionDigits: 0});
+  if (a >= 100)   return (Math.round(x*10)/10).toLocaleString("en-US");
+  if (a >= 1)     return String(Math.round(x*1000)/1000);
+  return String(Number(x.toPrecision(4)));
+}
+const PI_S = "&pi;";
+
+/* step = {lhs, sym, sub, val, unit, note}  — rendered as  lhs = sym = sub = val unit  (note) */
+function stepHTML(s){
+  let h = `<div class="step"><span class="lhs">${s.lhs}</span>`;
+  if (s.sym != null) h += `<span class="eq">=</span><span class="sym">${s.sym}</span>`;
+  if (s.sub != null) h += `<span class="eq">=</span><span class="sub">${s.sub}</span>`;
+  if (s.val != null) h += `<span class="eq">=</span><span class="res ${s.cls||""}">${s.val}${s.unit ? "&nbsp;" + s.unit : ""}</span>`;
+  if (s.note) h += `<span class="note">${s.note}</span>`;
+  return h + `</div>`;
+}
+function region(title, cls, steps, extra){
+  return `<div class="region ${cls}"><div class="rtitle">${title}</div>` +
+         steps.map(stepHTML).join("") + (extra || "") + `</div>`;
+}
+
+/* =====================================================================
+   SVG diagrams  (weld lines dark red, x-x axis dashed, dims blue)
+   ===================================================================== */
+const W = 'stroke="#8b1a1a" stroke-width="6" stroke-linecap="square" fill="none"';
+const Wt = 'stroke="#8b1a1a" stroke-width="3.5" stroke-linecap="square" fill="none"';
+const AX = 'stroke="#888" stroke-width="1.3" stroke-dasharray="6 4"';
+const DIM = 'stroke="#1d5fbf" stroke-width="1.2"';
+const TXT = 'font-family="Georgia,serif" font-style="italic" font-size="13" fill="#1d5fbf"';
+const XT  = 'font-family="Georgia,serif" font-style="italic" font-size="11" fill="#777"';
+
+function dimH(x1,x2,y,label){  // horizontal dimension line
+  return `<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" ${DIM} marker-start="url(#a1)" marker-end="url(#a2)"/>
+          <text x="${(x1+x2)/2}" y="${y-4}" text-anchor="middle" ${TXT}>${label}</text>`;
+}
+function dimV(x,y1,y2,label){
+  return `<line x1="${x}" y1="${y1}" x2="${x}" y2="${y2}" ${DIM} marker-start="url(#a3)" marker-end="url(#a4)"/>
+          <text x="${x+5}" y="${(y1+y2)/2+4}" ${TXT}>${label}</text>`;
+}
+function axis(y){
+  return `<line x1="6" y1="${y}" x2="134" y2="${y}" ${AX}/>
+          <text x="3" y="${y-3}" ${XT}>x</text><text x="128" y="${y-3}" ${XT}>x</text>`;
+}
+const DEFS = `<defs>
+ <marker id="a1" markerWidth="8" markerHeight="8" refX="1" refY="4" orient="auto"><path d="M8,1 L1,4 L8,7" fill="none" stroke="#1d5fbf"/></marker>
+ <marker id="a2" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,1 L7,4 L0,7" fill="none" stroke="#1d5fbf"/></marker>
+ <marker id="a3" markerWidth="8" markerHeight="8" refX="4" refY="1" orient="auto-start-reverse"><path d="M1,8 L4,1 L7,8" fill="none" stroke="#1d5fbf"/></marker>
+ <marker id="a4" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M1,0 L4,7 L7,0" fill="none" stroke="#1d5fbf"/></marker>
+</defs>`;
+const svgWrap = inner => `<svg viewBox="0 0 140 118" xmlns="http://www.w3.org/2000/svg">${DEFS}${inner}</svg>`;
+
+/* geometry box used by all diagrams: x 45..105, y 22..92 */
+const SVGS = {
+  1:  svgWrap(`${axis(57)}<line x1="75" y1="22" x2="75" y2="92" ${W}/>${dimV(38,22,92,"d")}`),
+  2:  svgWrap(`${axis(57)}<line x1="52" y1="22" x2="52" y2="92" ${W}/><line x1="98" y1="22" x2="98" y2="92" ${W}/>
+       ${dimH(52,98,14,"b")}${dimV(112,22,92,"d")}`),
+  3:  svgWrap(`${axis(57)}<line x1="48" y1="24" x2="102" y2="24" ${W}/><line x1="48" y1="90" x2="102" y2="90" ${W}/>
+       ${dimH(48,102,13,"b")}${dimV(114,24,90,"d")}`),
+  4:  svgWrap(`${axis(52)}<polyline points="102,24 50,24 50,92" ${W}/>
+       ${dimH(50,102,13,"b")}${dimV(36,24,92,"d")}`),
+  5:  svgWrap(`${axis(57)}<line x1="50" y1="24" x2="100" y2="24" ${W}/><line x1="50" y1="90" x2="100" y2="90" ${W}/>
+       <line x1="50" y1="24" x2="50" y2="90" ${W}/>${dimH(50,100,13,"b")}${dimV(114,24,90,"d")}`),
+  6:  svgWrap(`${axis(50)}<polyline points="50,92 50,24 100,24 100,92" ${W}/>
+       ${dimH(50,100,13,"b")}${dimV(114,24,92,"d")}`),
+  7:  svgWrap(`${axis(57)}<rect x="50" y="24" width="50" height="66" ${W}/>
+       ${dimH(50,100,13,"b")}${dimV(114,24,90,"d")}`),
+  8:  svgWrap(`${axis(48)}<line x1="46" y1="26" x2="104" y2="26" ${W}/>
+       <line x1="72" y1="28" x2="72" y2="92" ${Wt}/><line x1="78" y1="28" x2="78" y2="92" ${Wt}/>
+       ${dimH(46,104,13,"b")}${dimV(118,26,92,"d")}`),
+  9:  svgWrap(`${axis(48)}<line x1="46" y1="24" x2="104" y2="24" ${Wt}/><line x1="46" y1="30" x2="104" y2="30" ${Wt}/>
+       <line x1="72" y1="32" x2="72" y2="92" ${Wt}/><line x1="78" y1="32" x2="78" y2="92" ${Wt}/>
+       ${dimH(46,104,13,"b")}${dimV(118,27,92,"d")}`),
+  10: svgWrap(`${axis(57)}<line x1="46" y1="24" x2="104" y2="24" ${W}/><line x1="46" y1="90" x2="104" y2="90" ${W}/>
+       <line x1="72" y1="27" x2="72" y2="87" ${Wt}/><line x1="78" y1="27" x2="78" y2="87" ${Wt}/>
+       ${dimH(46,104,13,"b")}${dimV(118,24,90,"d")}`),
+  11: svgWrap(`${axis(57)}<line x1="46" y1="21" x2="104" y2="21" ${Wt}/><line x1="46" y1="27" x2="104" y2="27" ${Wt}/>
+       <line x1="46" y1="87" x2="104" y2="87" ${Wt}/><line x1="46" y1="93" x2="104" y2="93" ${Wt}/>
+       <line x1="72" y1="29" x2="72" y2="85" ${Wt}/><line x1="78" y1="29" x2="78" y2="85" ${Wt}/>
+       ${dimH(46,104,11,"b")}${dimV(118,24,90,"d")}`),
+  12: svgWrap(`${axis(57)}<circle cx="75" cy="57" r="33" ${W}/>
+       <line x1="53" y1="79" x2="97" y2="35" ${DIM} marker-start="url(#a1)" marker-end="url(#a2)"/>
+       <text x="70" y="52" ${TXT}>d</text>`),
+  13: svgWrap(`${axis(57)}<ellipse cx="60" cy="57" rx="17" ry="33" ${W}/><ellipse cx="90" cy="57" rx="17" ry="33" ${W}/>
+       <line x1="52" y1="80" x2="68" y2="34" ${DIM} marker-start="url(#a1)" marker-end="url(#a2)"/>
+       <text x="52" y="50" ${TXT}>d</text>${dimH(60,90,104,"D")}`)
+};
+
+/* =====================================================================
+   Shape definitions — Table 22.3
+   Each returns { steps:[...], Aw, SwTop, SwBot, Jw|null, cx, cy,
+                  extra geometry steps }        († = printing correction)
+   ===================================================================== */
+const S2="<sup>2</sup>", S3="<sup>3</sup>", S4="<sup>4</sup>";
+const DAG = `<sup style="font-size:11px;color:#b45309">&dagger;</sup>`;
+
+const SHAPES = [
+{ id:1, name:"1 · Single vertical weld", dims:["d"],
+  calc(v){ const d=v.d;
+    const Aw=d, Sw=d*d/6, Jw=d*d*d/12;
+    return { Aw, SwTop:Sw, SwBot:Sw, Jw, cx:0, cy:d/2, steps:[
+      {lhs:"A<sub>w</sub>", sym:"d", sub:n(d), val:n(Aw), unit:"in"},
+      {lhs:"S<sub>w</sub>", sym:fr("d"+S2,"6"), sub:fr(`(${n(d)})${S2}`,"6"), val:n(Sw), unit:"in&sup2;"},
+      {lhs:"J<sub>w</sub>", sym:fr("d"+S3,"12"), sub:fr(`(${n(d)})${S3}`,"12"), val:n(Jw), unit:"in&sup3;"}
+    ]};
+  }},
+{ id:2, name:"2 · Two parallel vertical welds", dims:["b","d"],
+  calc(v){ const {b,d}=v;
+    const Aw=2*d, Sw=d*d/3, Jw=d*(3*b*b+d*d)/6;
+    return { Aw, SwTop:Sw, SwBot:Sw, Jw, cx:b/2, cy:d/2, steps:[
+      {lhs:"A<sub>w</sub>", sym:"2d", sub:`2(${n(d)})`, val:n(Aw), unit:"in"},
+      {lhs:"S<sub>w</sub>", sym:fr("d"+S2,"3"), sub:fr(`(${n(d)})${S2}`,"3"), val:n(Sw), unit:"in&sup2;"},
+      {lhs:"J<sub>w</sub>", sym:fr(`d(3b${S2} + d${S2})`,"6"),
+        sub:fr(`${n(d)}&thinsp;[3(${n(b)})${S2} + (${n(d)})${S2}]`,"6"), val:n(Jw), unit:"in&sup3;"}
+    ]};
+  }},
+{ id:3, name:"3 · Two parallel horizontal welds", dims:["b","d"],
+  calc(v){ const {b,d}=v;
+    const Aw=2*b, Sw=b*d, Jw=(b*b*b+3*b*d*d)/6;
+    return { Aw, SwTop:Sw, SwBot:Sw, Jw, cx:b/2, cy:d/2, steps:[
+      {lhs:"A<sub>w</sub>", sym:"2b", sub:`2(${n(b)})`, val:n(Aw), unit:"in"},
+      {lhs:"S<sub>w</sub>", sym:"b&thinsp;d", sub:`(${n(b)})(${n(d)})`, val:n(Sw), unit:"in&sup2;"},
+      {lhs:"J<sub>w</sub>", sym:fr(`b${S3} + 3bd${S2}`,"6"),
+        sub:fr(`(${n(b)})${S3} + 3(${n(b)})(${n(d)})${S2}`,"6"), val:n(Jw), unit:"in&sup3;"}
+    ]};
+  }},
+{ id:4, name:"4 · L-shaped weld (top + one side)", dims:["b","d"],
+  calc(v){ const {b,d}=v; const u=b+d;
+    const Aw=u, Ny=b*b/(2*u), Nx=d*d/(2*u);
+    const SwTop=(4*b*d+d*d)/6, SwBot=d*d*(4*b+d)/(6*(2*b+d));
+    const Jw=(Math.pow(u,4)-6*b*b*d*d)/(12*u);
+    return { Aw, SwTop, SwBot, Jw, cx:Math.max(Ny,b-Ny), cy:Math.max(Nx,d-Nx), steps:[
+      {lhs:"A<sub>w</sub>", sym:"b + d", sub:`${n(b)} + ${n(d)}`, val:n(Aw), unit:"in"},
+      {lhs:"N<sub>y</sub>", sym:fr("b"+S2,"2(b + d)"), sub:fr(`(${n(b)})${S2}`,`2(${n(u)})`),
+        val:n(Ny), unit:"in", note:"centroid &rarr; from vertical weld"},
+      {lhs:"N<sub>x</sub>"+DAG, sym:fr("d"+S2,"2(b + d)"), sub:fr(`(${n(d)})${S2}`,`2(${n(u)})`),
+        val:n(Nx), unit:"in", note:"centroid &darr; from top weld"},
+      {lhs:"S<sub>w,top</sub>", sym:fr(`4bd + d${S2}`,"6"),
+        sub:fr(`4(${n(b)})(${n(d)}) + (${n(d)})${S2}`,"6"), val:n(SwTop), unit:"in&sup2;"},
+      {lhs:"S<sub>w,bot</sub>"+DAG, sym:fr(`d${S2}(4b + d)`,"6(2b + d)"),
+        sub:fr(`(${n(d)})${S2}&thinsp;(${n(4*b+d)})`,`6(${n(2*b+d)})`), val:n(SwBot), unit:"in&sup2;"},
+      {lhs:"J<sub>w</sub>", sym:fr(`(b + d)${S4} &minus; 6b${S2}d${S2}`,"12(b + d)"),
+        sub:fr(`(${n(u)})${S4} &minus; 6(${n(b)})${S2}(${n(d)})${S2}`,`12(${n(u)})`), val:n(Jw), unit:"in&sup3;"}
+    ]};
+  }},
+{ id:5, name:"5 · Channel weld, open one side (⊏)", dims:["b","d"],
+  calc(v){ const {b,d}=v; const u=2*b+d;
+    const Aw=u, Ny=b*b/u, Sw=b*d+d*d/6;
+    const Jw=Math.pow(u,3)/12 - b*b*(b+d)*(b+d)/u;
+    return { Aw, SwTop:Sw, SwBot:Sw, Jw, cx:Math.max(Ny,b-Ny), cy:d/2, steps:[
+      {lhs:"A<sub>w</sub>", sym:"2b + d", sub:`2(${n(b)}) + ${n(d)}`, val:n(Aw), unit:"in"},
+      {lhs:"N<sub>y</sub>"+DAG, sym:fr("b"+S2,"2b + d"), sub:fr(`(${n(b)})${S2}`,`${n(u)}`),
+        val:n(Ny), unit:"in", note:"centroid &rarr; from vertical weld"},
+      {lhs:"S<sub>w</sub>", sym:`bd + ` + fr("d"+S2,"6"),
+        sub:`(${n(b)})(${n(d)}) + ` + fr(`(${n(d)})${S2}`,"6"), val:n(Sw), unit:"in&sup2;"},
+      {lhs:"J<sub>w</sub>", sym:fr(`(2b + d)${S3}`,"12") + ` &minus; ` + fr(`b${S2}(b + d)${S2}`,"2b + d"),
+        sub:fr(`(${n(u)})${S3}`,"12") + ` &minus; ` + fr(`(${n(b)})${S2}(${n(b+d)})${S2}`,`${n(u)}`),
+        val:n(Jw), unit:"in&sup3;"}
+    ]};
+  }},
+{ id:6, name:"6 · Channel weld, open bottom (⊓)", dims:["b","d"],
+  calc(v){ const {b,d}=v; const u=b+2*d;
+    const Aw=u, Nx=d*d/u;
+    const SwTop=(2*b*d+d*d)/3, SwBot=d*d*(2*b+d)/(3*(b+d));
+    const Jw=Math.pow(u,3)/12 - d*d*(b+d)*(b+d)/u;
+    return { Aw, SwTop, SwBot, Jw, cx:b/2, cy:Math.max(Nx,d-Nx), steps:[
+      {lhs:"A<sub>w</sub>", sym:"b + 2d", sub:`${n(b)} + 2(${n(d)})`, val:n(Aw), unit:"in"},
+      {lhs:"N<sub>x</sub>"+DAG, sym:fr("d"+S2,"b + 2d"), sub:fr(`(${n(d)})${S2}`,`${n(u)}`),
+        val:n(Nx), unit:"in", note:"centroid &darr; from top weld"},
+      {lhs:"S<sub>w,top</sub>", sym:fr(`2bd + d${S2}`,"3"),
+        sub:fr(`2(${n(b)})(${n(d)}) + (${n(d)})${S2}`,"3"), val:n(SwTop), unit:"in&sup2;"},
+      {lhs:"S<sub>w,bot</sub>", sym:fr(`d${S2}(2b + d)`,"3(b + d)"),
+        sub:fr(`(${n(d)})${S2}(${n(2*b+d)})`,`3(${n(b+d)})`), val:n(SwBot), unit:"in&sup2;"},
+      {lhs:"J<sub>w</sub>"+DAG, sym:fr(`(b + 2d)${S3}`,"12") + ` &minus; ` + fr(`d${S2}(b + d)${S2}`,"b + 2d"),
+        sub:fr(`(${n(u)})${S3}`,"12") + ` &minus; ` + fr(`(${n(d)})${S2}(${n(b+d)})${S2}`,`${n(u)}`),
+        val:n(Jw), unit:"in&sup3;"}
+    ]};
+  }},
+{ id:7, name:"7 · Rectangular weld, all around", dims:["b","d"],
+  calc(v){ const {b,d}=v;
+    const Aw=2*b+2*d, Sw=b*d+d*d/3, Jw=Math.pow(b+d,3)/6;
+    return { Aw, SwTop:Sw, SwBot:Sw, Jw, cx:b/2, cy:d/2, steps:[
+      {lhs:"A<sub>w</sub>", sym:"2b + 2d", sub:`2(${n(b)}) + 2(${n(d)})`, val:n(Aw), unit:"in"},
+      {lhs:"S<sub>w</sub>", sym:`bd + ` + fr("d"+S2,"3"),
+        sub:`(${n(b)})(${n(d)}) + ` + fr(`(${n(d)})${S2}`,"3"), val:n(Sw), unit:"in&sup2;"},
+      {lhs:"J<sub>w</sub>", sym:fr(`(b + d)${S3}`,"6"), sub:fr(`(${n(b+d)})${S3}`,"6"),
+        val:n(Jw), unit:"in&sup3;"}
+    ]};
+  }},
+{ id:8, name:"8 · Tee — flange weld + double stem welds", dims:["b","d"],
+  calc(v){ const {b,d}=v; const u=b+2*d;
+    const Aw=u, Nx=d*d/u;
+    const SwTop=(2*b*d+d*d)/3, SwBot=d*d*(2*b+d)/(3*(b+d));
+    const JwPub=Math.pow(u,3)/12 - d*d*(b+d)*(b+d)/u;
+    const Jw=JwPub - b*b*d/2;      // stem welds lie on the y-axis; remove the channel flange-offset term
+    return { Aw, SwTop, SwBot, Jw, cx:b/2, cy:Math.max(Nx,d-Nx), steps:[
+      {lhs:"A<sub>w</sub>", sym:"b + 2d", sub:`${n(b)} + 2(${n(d)})`, val:n(Aw), unit:"in"},
+      {lhs:"N<sub>x</sub>"+DAG, sym:fr("d"+S2,"b + 2d"), sub:fr(`(${n(d)})${S2}`,`${n(u)}`),
+        val:n(Nx), unit:"in", note:"centroid &darr; from flange weld"},
+      {lhs:"S<sub>w,top</sub>", sym:fr(`2bd + d${S2}`,"3"),
+        sub:fr(`2(${n(b)})(${n(d)}) + (${n(d)})${S2}`,"3"), val:n(SwTop), unit:"in&sup2;"},
+      {lhs:"S<sub>w,bot</sub>", sym:fr(`d${S2}(2b + d)`,"3(b + d)"),
+        sub:fr(`(${n(d)})${S2}(${n(2*b+d)})`,`3(${n(b+d)})`), val:n(SwBot), unit:"in&sup2;"},
+      {lhs:"J<sub>w,pub</sub>", sym:fr(`(b + 2d)${S3}`,"12") + ` &minus; ` + fr(`d${S2}(b + d)${S2}`,"b + 2d"),
+        sub:fr(`(${n(u)})${S3}`,"12") + ` &minus; ` + fr(`(${n(d)})${S2}(${n(b+d)})${S2}`,`${n(u)}`),
+        val:n(JwPub), unit:"in&sup3;", note:"as published (repeats shape 6)"},
+      {lhs:"J<sub>w</sub>"+DAG, sym:`J<sub>w,pub</sub> &minus; ` + fr(`b${S2}d`,"2"),
+        sub:`${n(JwPub)} &minus; ` + fr(`(${n(b)})${S2}(${n(d)})`,"2"),
+        val:n(Jw), unit:"in&sup3;", note:"corrected — stem welds lie on the y-axis; used for capacity"}
+    ]};
+  }},
+{ id:9, name:"9 · Tee — double flange + double stem welds", dims:["b","d"],
+  calc(v){ const {b,d}=v; const u=b+d;
+    const Aw=2*u, Ny=d*d/(2*u);
+    const SwTop=(4*b*d+d*d)/3, SwBot=(4*b*d*d+d*d*d)/(6*b+3*d);
+    const Jw=d*d*d*(4*b+d)/(6*u) + b*b*b/6;
+    return { Aw, SwTop, SwBot, Jw, cx:b/2, cy:Math.max(Ny,d-Ny), steps:[
+      {lhs:"A<sub>w</sub>", sym:"2(b + d)", sub:`2(${n(u)})`, val:n(Aw), unit:"in"},
+      {lhs:"N<sub>y</sub>"+DAG, sym:fr("d"+S2,"2(b + d)"), sub:fr(`(${n(d)})${S2}`,`2(${n(u)})`),
+        val:n(Ny), unit:"in", note:"centroid &darr; from flange welds"},
+      {lhs:"S<sub>w,top</sub>", sym:fr(`4bd + d${S2}`,"3"),
+        sub:fr(`4(${n(b)})(${n(d)}) + (${n(d)})${S2}`,"3"), val:n(SwTop), unit:"in&sup2;"},
+      {lhs:"S<sub>w,bot</sub>", sym:fr(`4bd${S2} + d${S3}`,"6b + 3d"),
+        sub:fr(`4(${n(b)})(${n(d)})${S2} + (${n(d)})${S3}`,`${n(6*b+3*d)}`), val:n(SwBot), unit:"in&sup2;"},
+      {lhs:"J<sub>w</sub>", sym:fr(`d${S3}(4b + d)`,"6(b + d)") + ` + ` + fr("b"+S3,"6"),
+        sub:fr(`(${n(d)})${S3}(${n(4*b+d)})`,`6(${n(u)})`) + ` + ` + fr(`(${n(b)})${S3}`,"6"),
+        val:n(Jw), unit:"in&sup3;"}
+    ]};
+  }},
+{ id:10, name:"10 · I-shape — flange welds + double web welds", dims:["b","d"],
+  calc(v){ const {b,d}=v;
+    const Aw=2*b+2*d, Sw=b*d+d*d/3, Jw=(b*b*b+3*b*d*d+d*d*d)/6;
+    return { Aw, SwTop:Sw, SwBot:Sw, Jw, cx:b/2, cy:d/2, steps:[
+      {lhs:"A<sub>w</sub>", sym:"2b + 2d", sub:`2(${n(b)}) + 2(${n(d)})`, val:n(Aw), unit:"in"},
+      {lhs:"S<sub>w</sub>", sym:`bd + ` + fr("d"+S2,"3"),
+        sub:`(${n(b)})(${n(d)}) + ` + fr(`(${n(d)})${S2}`,"3"), val:n(Sw), unit:"in&sup2;"},
+      {lhs:"J<sub>w</sub>", sym:fr(`b${S3} + 3bd${S2} + d${S3}`,"6"),
+        sub:fr(`(${n(b)})${S3} + 3(${n(b)})(${n(d)})${S2} + (${n(d)})${S3}`,"6"),
+        val:n(Jw), unit:"in&sup3;"}
+    ]};
+  }},
+{ id:11, name:"11 · I-shape — double flange + double web welds", dims:["b","d"],
+  calc(v){ const {b,d}=v;
+    const Aw=4*b+2*d, Sw=2*b*d+d*d/3, Jw=(2*b*b*b+6*b*d*d+d*d*d)/6;
+    return { Aw, SwTop:Sw, SwBot:Sw, Jw, cx:b/2, cy:d/2, steps:[
+      {lhs:"A<sub>w</sub>", sym:"4b + 2d", sub:`4(${n(b)}) + 2(${n(d)})`, val:n(Aw), unit:"in"},
+      {lhs:"S<sub>w</sub>", sym:`2bd + ` + fr("d"+S2,"3"),
+        sub:`2(${n(b)})(${n(d)}) + ` + fr(`(${n(d)})${S2}`,"3"), val:n(Sw), unit:"in&sup2;"},
+      {lhs:"J<sub>w</sub>", sym:fr(`2b${S3} + 6bd${S2} + d${S3}`,"6"),
+        sub:fr(`2(${n(b)})${S3} + 6(${n(b)})(${n(d)})${S2} + (${n(d)})${S3}`,"6"),
+        val:n(Jw), unit:"in&sup3;"}
+    ]};
+  }},
+{ id:12, name:"12 · Circular weld", dims:["d"],
+  calc(v){ const d=v.d;
+    const Aw=Math.PI*d, Sw=Math.PI*d*d/4, Jw=Math.PI*d*d*d/4;
+    return { Aw, SwTop:Sw, SwBot:Sw, Jw, cx:0, cy:d/2, steps:[
+      {lhs:"A<sub>w</sub>", sym:PI_S+"d", sub:`${PI_S}(${n(d)})`, val:n(Aw), unit:"in"},
+      {lhs:"S<sub>w</sub>", sym:fr(PI_S+"d"+S2,"4"), sub:fr(`${PI_S}(${n(d)})${S2}`,"4"),
+        val:n(Sw), unit:"in&sup2;"},
+      {lhs:"J<sub>w</sub>", sym:fr(PI_S+"d"+S3,"4"), sub:fr(`${PI_S}(${n(d)})${S3}`,"4"),
+        val:n(Jw), unit:"in&sup3;"}
+    ]};
+  }},
+{ id:13, name:"13 · Two circular welds", dims:["d","D"],
+  calc(v){ const d=v.d, D=v.D;
+    const Aw=2*Math.PI*d, Sw=Math.PI*d*d/2 + Math.PI*D*D;
+    return { Aw, SwTop:Sw, SwBot:Sw, Jw:null, cx:0, cy:d/2, steps:[
+      {lhs:"A<sub>w</sub>", sym:"2"+PI_S+"d", sub:`2${PI_S}(${n(d)})`, val:n(Aw), unit:"in"},
+      {lhs:"S<sub>w</sub>", sym:fr(PI_S+"d"+S2,"2") + ` + ${PI_S}D${S2}`,
+        sub:fr(`${PI_S}(${n(d)})${S2}`,"2") + ` + ${PI_S}(${n(D)})${S2}`,
+        val:n(Sw), unit:"in&sup2;"},
+      {lhs:"J<sub>w</sub>", sym:"&mdash;", note:"not given in Table 22.3 — twisting not evaluated"}
+    ]};
+  }}
+];
+
+/* =====================================================================
+   Worksheet assembly
+   ===================================================================== */
+let selShape = 7;
+
+function readInputs(){
+  const g = id => Math.max(0, parseFloat(document.getElementById(id).value) || 0);
+  const gs = id => parseFloat(document.getElementById(id).value) || 0;
+  return { b:g("in-b"), d:g("in-d"), D:g("in-D"), w:g("in-w"),
+           fexx:parseFloat(document.getElementById("in-fexx").value),
+           fy:g("in-fy"), t:g("in-t"),
+           P:Math.abs(gs("in-P")), V:Math.abs(gs("in-V")),
+           M:Math.abs(gs("in-M")), T:Math.abs(gs("in-T")) };
+}
+
+function minFillet(t){          // AWS D1.1 minimum fillet leg by plate thickness
+  if (t <= 0.25) return 0.125;
+  if (t <= 0.5)  return 0.1875;
+  if (t <= 0.75) return 0.25;
+  return 0.3125;
+}
+
+function render(){
+  const shape = SHAPES.find(s => s.id === selShape);
+  const v = readInputs();
+  const out = document.getElementById("out");
+
+  // toggle dimension fields
+  document.getElementById("f-b").style.display = shape.dims.includes("b") ? "" : "none";
+  document.getElementById("f-d").style.display = shape.dims.includes("d") ? "" : "none";
+  document.getElementById("f-D").style.display = shape.dims.includes("D") ? "" : "none";
+  document.getElementById("shapename").textContent = shape.name;
+  document.getElementById("bigshape").innerHTML = SVGS[shape.id];
+
+  const need = shape.dims.filter(k => !(v[k] > 0));
+  if (need.length || !(v.w > 0)){
+    out.innerHTML = `<div class="err">Enter positive values for: ${
+      [...need, ...(v.w > 0 ? [] : ["&omega;"])].join(", ")}</div>`;
+    return;
+  }
+
+  const r = shape.calc(v);
+  const c = Math.sqrt(r.cx*r.cx + r.cy*r.cy);
+  let html = "";
+
+  /* --- Region 1: line properties (Table 22.3) --- */
+  const geomSteps = [...r.steps];
+  if (r.Jw != null){
+    geomSteps.push({lhs:"c", sym:sq(`c<sub>x</sub>${S2} + c<sub>y</sub>${S2}`),
+      sub:sq(`(${n(r.cx)})${S2} + (${n(r.cy)})${S2}`), val:n(c), unit:"in",
+      note:"farthest weld point from centroid (for twisting)"});
+  }
+  html += region("① Properties of the weld treated as a line — Table 22.3", "props", geomSteps);
+
+  /* --- Region 2: allowable unit force (Table 22.4) --- */
+  const tau = 0.30 * v.fexx;                    // ksi on throat
+  const fw  = tau * 0.707 * v.w;                // kips/in of weld line
+  const fb  = 0.40 * v.fy * v.t;                // base-metal shear limit, kips/in
+  const fa  = Math.min(fw, fb);
+  const govern = fw <= fb ? "weld metal governs" : "base metal governs";
+  const allowSteps = [
+    {lhs:"&tau;<sub>allow</sub>", sym:"0.30&thinsp;F<sub>EXX</sub>", sub:`0.30&thinsp;(${n(v.fexx)})`,
+      val:n(tau), unit:"ksi", note:"shear on effective throat, Table 22.4"},
+    {lhs:"f<sub>weld</sub>", sym:"0.707&thinsp;&omega;&thinsp;&tau;<sub>allow</sub>",
+      sub:`0.707&thinsp;(${n(v.w)})(${n(tau)})`, val:n(fw), unit:"kips/in"},
+    {lhs:"f<sub>base</sub>", sym:"0.40&thinsp;F<sub>y</sub>&thinsp;t",
+      sub:`0.40&thinsp;(${n(v.fy)})(${n(v.t)})`, val:n(fb), unit:"kips/in",
+      note:"shear on base metal at weld line"},
+    {lhs:"f<sub>allow</sub>", sym:"min(&thinsp;f<sub>weld</sub>, f<sub>base</sub>&thinsp;)",
+      sub:`min(${n(fw)}, ${n(fb)})`, val:n(fa), unit:"kips/in", cls:"good", note:govern}
+  ];
+  let minw = minFillet(v.t), maxw = v.t >= 0.25 ? v.t - 0.0625 : v.t;
+  let wnote = "";
+  if (v.w < minw) wnote = `<div class="verdict no">&omega; = ${n(v.w)}&Prime; is below the AWS D1.1 minimum
+      fillet of ${n(minw)}&Prime; for t = ${n(v.t)}&Prime;</div>`;
+  else if (v.w > maxw) wnote = `<div class="verdict no">&omega; = ${n(v.w)}&Prime; exceeds the maximum
+      ${n(maxw)}&Prime; permitted along a plate edge of t = ${n(v.t)}&Prime;</div>`;
+  html += region("② Allowable unit force on the weld line — Table 22.4", "allow", allowSteps, wnote);
+
+  /* --- Region 3: capacities of the weld line --- */
+  const SwMin = Math.min(r.SwTop, r.SwBot);
+  const Pall = fa * r.Aw, Vall = fa * r.Aw, Mall = fa * SwMin;
+  const Tall = r.Jw != null ? fa * r.Jw / c : null;
+  const capSteps = [
+    {lhs:"P<sub>allow</sub>", sym:"f<sub>allow</sub>&thinsp;A<sub>w</sub>",
+      sub:`(${n(fa)})(${n(r.Aw)})`, val:n(Pall), unit:"kips", note:"axial tension / compression"},
+    {lhs:"V<sub>allow</sub>", sym:"f<sub>allow</sub>&thinsp;A<sub>w</sub>",
+      sub:`(${n(fa)})(${n(r.Aw)})`, val:n(Vall), unit:"kips", note:"vertical shear"},
+    {lhs:"M<sub>allow</sub>", sym:"f<sub>allow</sub>&thinsp;S<sub>w</sub>",
+      sub:`(${n(fa)})(${n(SwMin)})`, val:n(Mall), unit:"kip·in",
+      note: r.SwTop !== r.SwBot ? "governing (smaller) S<sub>w</sub> used" : "bending about x-x"}
+  ];
+  if (Tall != null){
+    capSteps.push({lhs:"T<sub>allow</sub>", sym:fr("f<sub>allow</sub>&thinsp;J<sub>w</sub>","c"),
+      sub:fr(`(${n(fa)})(${n(r.Jw)})`,`${n(c)}`), val:n(Tall), unit:"kip·in", note:"twisting"});
+  }
+  html += region(`③ Capacity of the weld line (<span style="text-transform:none">&omega;</span> = ${n(v.w)}&Prime; fillet)`, "cap", capSteps);
+
+  /* --- Region 4: applied load check (Table 22.2 + vector combination) --- */
+  if (v.P || v.V || v.M || (v.T && r.Jw != null)){
+    const chkSteps = [];
+    const fP = v.P / r.Aw, fV = v.V / r.Aw;
+    if (v.P) chkSteps.push({lhs:"f<sub>P</sub>", sym:fr("P","A<sub>w</sub>"),
+      sub:fr(`${n(v.P)}`,`${n(r.Aw)}`), val:n(fP), unit:"kips/in", note:"axial — horizontal component"});
+    if (v.V) chkSteps.push({lhs:"f<sub>V</sub>", sym:fr("V","A<sub>w</sub>"),
+      sub:fr(`${n(v.V)}`,`${n(r.Aw)}`), val:n(fV), unit:"kips/in", note:"shear — vertical component"});
+
+    // evaluate extreme top & bottom points
+    const pts = [
+      {name:"top",    Sw:r.SwTop, cy:r.cy },
+      {name:"bottom", Sw:r.SwBot, cy:r.cy }
+    ];
+    let best = null;
+    for (const p of pts){
+      const fM = v.M ? v.M / p.Sw : 0;
+      const fTh = (v.T && r.Jw != null) ? v.T * p.cy / r.Jw : 0;  // horizontal from torsion
+      const fTv = (v.T && r.Jw != null) ? v.T * r.cx / r.Jw : 0;  // vertical from torsion
+      const fh = fP + fM + fTh, fv = fV + fTv;
+      const fres = Math.sqrt(fh*fh + fv*fv);
+      if (!best || fres > best.fres) best = {...p, fM, fTh, fTv, fh, fv, fres};
+    }
+    if (v.M) chkSteps.push({lhs:"f<sub>M</sub>", sym:fr("M","S<sub>w</sub>"),
+      sub:fr(`${n(v.M)}`,`${n(best.Sw)}`), val:n(best.fM), unit:"kips/in",
+      note:`bending — horizontal, at ${best.name} (governs)`});
+    if (v.T && r.Jw != null){
+      chkSteps.push({lhs:"f<sub>T,h</sub>", sym:fr("T&thinsp;c<sub>y</sub>","J<sub>w</sub>"),
+        sub:fr(`(${n(v.T)})(${n(best.cy)})`,`${n(r.Jw)}`), val:n(best.fTh), unit:"kips/in",
+        note:"twisting — horizontal component"});
+      chkSteps.push({lhs:"f<sub>T,v</sub>", sym:fr("T&thinsp;c<sub>x</sub>","J<sub>w</sub>"),
+        sub:fr(`(${n(v.T)})(${n(r.cx)})`,`${n(r.Jw)}`), val:n(best.fTv), unit:"kips/in",
+        note:"twisting — vertical component"});
+    }
+    if (v.T && r.Jw == null){
+      chkSteps.push({lhs:"f<sub>T</sub>", sym:"&mdash;",
+        note:"J<sub>w</sub> not defined for this shape in Table 22.3 — torsion input ignored"});
+    }
+    chkSteps.push({lhs:"f<sub>R</sub>",
+      sym:sq(`(f<sub>P</sub> + f<sub>M</sub> + f<sub>T,h</sub>)${S2} + (f<sub>V</sub> + f<sub>T,v</sub>)${S2}`),
+      sub:sq(`(${n(best.fh)})${S2} + (${n(best.fv)})${S2}`),
+      val:n(best.fres), unit:"kips/in", note:"vector resultant at governing point"});
+
+    const wreq = best.fres / (0.707 * tau);
+    chkSteps.push({lhs:"&omega;<sub>req</sub>",
+      sym:fr("f<sub>R</sub>","0.707&thinsp;&tau;<sub>allow</sub>"),
+      sub:fr(`${n(best.fres)}`,`0.707&thinsp;(${n(tau)})`),
+      val:n(wreq), unit:"in", note:"required fillet leg size"});
+
+    const util = best.fres / fa;
+    chkSteps.push({lhs:"utilization", sym:fr("f<sub>R</sub>","f<sub>allow</sub>"),
+      sub:fr(`${n(best.fres)}`,`${n(fa)}`), val:(util*100).toFixed(1) + "%",
+      cls: util <= 1 ? "good" : "bad"});
+
+    const verdict = util <= 1
+      ? `<div class="verdict ok">OK — &omega; = ${n(v.w)}&Prime; weld is adequate
+         (f<sub>R</sub> = ${n(best.fres)} &le; f<sub>allow</sub> = ${n(fa)} kips/in)</div>`
+      : `<div class="verdict no">NG — increase weld to &omega; &ge; ${n(Math.ceil(wreq*16)/16)}&Prime;
+         (f<sub>R</sub> = ${n(best.fres)} &gt; f<sub>allow</sub> = ${n(fa)} kips/in)</div>`;
+    const bar = `<div class="bar"><i class="${util > 1 ? "over" : ""}"
+                 style="width:${Math.min(100, util*100)}%"></i></div>`;
+    html += region("④ Force on weld under applied loads — Table 22.2, combined vectorially", "chk",
+                   chkSteps, verdict + bar);
+  }
+
+  out.innerHTML = html;
+}
+
+/* =====================================================================
+   Wiring
+   ===================================================================== */
+function buildPicker(){
+  const host = document.getElementById("shapes");
+  host.innerHTML = SHAPES.map(s =>
+    `<button data-id="${s.id}" class="${s.id === selShape ? "sel" : ""}" title="${s.name}">
+       ${SVGS[s.id]}<div class="cap">${s.id}</div></button>`).join("");
+  host.querySelectorAll("button").forEach(btn => btn.addEventListener("click", () => {
+    selShape = +btn.dataset.id;
+    host.querySelectorAll("button").forEach(x => x.classList.toggle("sel", +x.dataset.id === selShape));
+    render();
+  }));
+}
+document.addEventListener("DOMContentLoaded", () => {
+  buildPicker();
+  document.querySelectorAll("#controls input, #controls select")
+    .forEach(el => el.addEventListener("input", render));
+  render();
+});
+</script>
+</body>
+</html>
